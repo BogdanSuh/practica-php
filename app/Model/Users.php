@@ -1,47 +1,72 @@
 <?php
-
 namespace Model;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Src\Auth\IdentityInterface;
 
 class Users extends Model implements IdentityInterface
 {
-    use HasFactory;
-
     public $timestamps = false;
     protected $primaryKey = 'user_id';
+    protected $table = 'users';
+
     protected $fillable = [
         'name',
         'login',
+        'password',
+        'role',
+        'reader_card'
+    ];
+
+    protected $hidden = [
         'password'
     ];
 
-    protected static function booted()
+    // Метод для аутентификации
+    public function attemptIdentity(array $credentials)
     {
-        static::created(function ($user) {
-            $user->password = md5($user->password);
-            $user->save();
-        });
+        $user = self::where('login', $credentials['login'])->first();
+
+        if ($user && password_verify($credentials['password'], $user->password)) {
+            return $user;
+        }
+
+        return null;
     }
 
-    //Выборка пользователя по первичному ключу
+    // Метод поиска пользователя по ID
     public function findIdentity(int $id)
     {
         return self::where('user_id', $id)->first();
     }
 
-    //Возврат первичного ключа
+    // Получение ID пользователя
     public function getId(): int
     {
-        return $this->id;
+        return $this->user_id;
     }
 
-    //Возврат аутентифицированного пользователя
-    public function attemptIdentity(array $credentials)
+    // Связь с бронированиями
+    public function bookings()
     {
-        return self::where(['login' => $credentials['login'],
-            'password' => md5($credentials['password'])])->first();
+        return $this->hasMany(Book::class, 'user_id', 'user_id');
+    }
+
+    // Получить активные бронирования пользователя
+    public function getActiveBookings()
+    {
+        return $this->bookings()
+            ->whereIn('status', ['reserved', 'issued'])
+            ->orderBy('booking_date', 'DESC')
+            ->get();
+    }
+
+    // Получить историю пользователя
+    public function getHistory()
+    {
+        return $this->bookings()
+            ->where('status', 'returned')
+            ->orderBy('return_date', 'DESC')
+            ->get();
     }
 }

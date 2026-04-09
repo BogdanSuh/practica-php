@@ -1,13 +1,33 @@
-<h2>Авторизация</h2>
-<h3><?= $message ?? ''; ?></h3>
+<div class="profile-info" style="text-align: center;">
+    <h2>Авторизация</h2>
+    <p>Войдите в библиотечную систему</p>
+</div>
 
-<h3><?= app()->auth->user()->name ?? ''; ?></h3>
-<?php
-if (!app()->auth::check()):
-    ?>
+<?php if (!empty($message)): ?>
+    <div class="error"><?= $message ?></div>
+<?php endif; ?>
+
+<?php if (!app()->auth::check()): ?>
     <form method="post">
-        <label>Логин <input type="text" name="login"></label>
-        <label>Пароль <input type="password" name="password"></label>
-        <button>Войти</button>
+        <div class="form-group">
+            <label>Логин</label>
+            <input type="text" name="login" required placeholder="Введите ваш логин">
+        </div>
+
+        <div class="form-group">
+            <label>Пароль</label>
+            <input type="password" name="password" required placeholder="Введите пароль">
+        </div>
+
+        <button type="submit">Войти в систему</button>
     </form>
-<?php endif;
+
+    <div class="text-center mt-20">
+        <p>Нет аккаунта? <a href="/signup">Зарегистрироваться</a></p>
+        <p style="font-size: 0.85em; color: var(--gray); margin-top: 10px;">
+            Тестовые данные:<br>
+            Библиотекарь: admin / admin123<br>
+            Читатель: reader / reader123
+        </p>
+    </div>
+<?php endif; ?>

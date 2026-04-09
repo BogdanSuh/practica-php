@@ -1,11 +1,9 @@
 <?php
 return [
-    //Класс аутентификации
     'auth' => \Src\Auth\Auth::class,
-    //Клас пользователя
-    'identity' => \Model\User::class,
-    //Классы для middleware
+    'identity' => \Model\Users::class,
     'routeMiddleware' => [
         'auth' => \Middlewares\AuthMiddleware::class,
+        'role' => \Middlewares\RoleMiddleware::class,
     ]
 ];
