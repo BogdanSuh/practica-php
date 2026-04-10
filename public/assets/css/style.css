@@ -259,19 +259,10 @@ tbody tr:hover {
     font-weight: 600;
 }
 
-.status-in-hall {
-    background: #d4edda;
-    color: #27ae60;
-}
 
 .status-reserved {
     background: #fff3cd;
     color: #f39c12;
-}
-
-.status-issued {
-    background: #f8d7da;
-    color: #e74c3c;
 }
 
 .error, .success, .info, .warning {
@@ -475,89 +466,30 @@ tbody tr:hover {
     color: var(--warning);
 }
 
-@media (max-width: 768px) {
-    nav {
-        flex-direction: column;
-        padding: 10px;
-    }
-
-    nav a {
-        padding: 10px 15px;
-    }
-
-    main {
-        margin: 20px auto;
-    }
-
-    main > * {
-        padding: 20px;
-    }
-
-    h1 {
-        font-size: 1.8em;
-    }
-
-    table {
-        font-size: 0.85em;
-    }
-
-    th, td {
-        padding: 8px 10px;
-    }
-
-    .grid {
-        grid-template-columns: 1fr;
-    }
-
-    .btn, button, .btn-reserve {
-        width: 100%;
-    }
-
-    .form-actions {
-        flex-direction: column;
-    }
-
-    .form-actions button, .form-actions a {
-        width: 100%;
-    }
-
-    .active-books-table td, .history-table td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .active-books-table td:before, .history-table td:before {
-        content: attr(data-label);
-        font-weight: bold;
-        margin-right: 10px;
-    }
-
-    form[style*="inline-flex"] {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .days-select {
-        width: 100%;
-        margin-bottom: 5px;
-    }
-
-    .readers-table td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-}
 
 @media print {
     header, nav, button, .btn, form {
         display: none;
     }
 
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
     body {
-        background: white;
+        font-family: 'Inter', sans-serif;
+        background: #f4f6f9;
+        min-height: 100vh;
+        color: var(--dark);
+        line-height: 1.5;
+        font-weight: 400;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+
+    button, .btn, input, select, textarea {
+        font-family: 'Inter', sans-serif;
     }
 
     main > * {

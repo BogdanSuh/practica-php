@@ -16,9 +16,6 @@
 <?php endif; ?>
 
 <?php if (app()->auth::check() && app()->auth::user()->role === 'librarian'): ?>
-    <div style="margin-bottom: 20px;">
-        <a href="/library/add-book" class="btn btn-success">Добавить новую книгу</a>
-    </div>
 <?php endif; ?>
 
 <form method="GET" class="search-form">
@@ -45,9 +42,8 @@
                     <div class="flex" style="margin-top: 10px;">
                         <?php foreach ($book['copies'] as $copy): ?>
                             <small>
-                                <a href="/library/edit-book?copy_id=<?= $copy->copy_id ?>">Редактировать</a> |
-                                <a href="/library/delete-book?copy_id=<?= $copy->copy_id ?>"
-                                   onclick="return confirm('Удалить эту книгу?')">Удалить</a>
+                                <a href="/practica-php/library/edit-book?copy_id=<?= $copy->copy_id ?>">Редактировать</a>
+                                <a href="/practica-php/library/delete-book?copy_id=<?= $copy->copy_id ?>">Удалить</a>
                             </small>
                         <?php endforeach; ?>
                     </div>

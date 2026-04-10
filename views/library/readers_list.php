@@ -8,9 +8,6 @@
     <div class="error"><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
 <?php endif; ?>
 
-<div style="margin-bottom: 20px;">
-    <a href="/library/add-reader" class="btn btn-success">Добавить читателя</a>
-</div>
 
 <?php if ($readers->isEmpty()): ?>
     <div class="info">Нет зарегистрированных читателей</div>

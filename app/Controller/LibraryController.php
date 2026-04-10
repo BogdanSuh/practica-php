@@ -233,8 +233,6 @@ class LibraryController
         ]);
     }
 
-    // Список читателей (для библиотекаря)
-    // Список читателей (для библиотекаря)
     // Книги конкретного читателя (для библиотекаря)
     public function readerBooks(Request $request): string
     {
@@ -399,6 +397,7 @@ class LibraryController
     }
 
     // Редактирование книги
+    // Редактирование книги
     public function editBook(Request $request): string
     {
         $copyId = $request->get('copy_id');
@@ -449,5 +448,31 @@ class LibraryController
         app()->route->redirect('/library/catalog');
         return '';
     }
+
+    public function readersList(Request $request): string
+    {
+        $readers = Users::where('role', 'reader')
+            ->orderBy('name')
+            ->get();
+
+        // Подсчитываем статистику для каждого читателя
+        foreach ($readers as $reader) {
+            // Количество активных книг (выданных и забронированных)
+            $reader->active_books = Book::where('user_id', $reader->user_id)
+                ->whereIn('status', ['issued', 'reserved'])
+                ->count();
+
+            // Количество прочитанных книг (возвращенных)
+            $reader->read_books = Book::where('user_id', $reader->user_id)
+                ->where('status', 'returned')
+                ->count();
+        }
+
+        return (new View())->render('library.readers_list', [
+            'readers' => $readers
+        ]);
+    }
+
+
 
 }

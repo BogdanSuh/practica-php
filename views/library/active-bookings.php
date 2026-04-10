@@ -54,7 +54,7 @@
                         <?php elseif ($booking->status === 'issued'): ?>
                             <form method="POST" action="/practica-php/library/return" style="display: inline;">
                                 <input type="hidden" name="booking_id" value="<?= $booking->booking_id ?>">
-                                <button type="submit" class="btn-warning">Принять возврат</button>
+                                <button type="submit" class="btn-warning">Вернуть</button>
                             </form>
                         <?php endif; ?>
                     </td>
