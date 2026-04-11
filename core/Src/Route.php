@@ -75,7 +75,6 @@ class Route
         $httpMethod = $_SERVER['REQUEST_METHOD'];
         $uri = $_SERVER['REQUEST_URI'];
 
-        // Strip query string (?foo=bar) and decode URI
         if (false !== $pos = strpos($uri, '?')) {
             $uri = substr($uri, 0, $pos);
         }
@@ -93,7 +92,8 @@ class Route
             case Dispatcher::FOUND:
                 $handler = $routeInfo[1];
                 $vars = array_values($routeInfo[2]);
-                $vars[] = Middleware::single()->runMiddlewares($httpMethod, $uri);
+                $request = new Request();
+                $vars[] = Middleware::single()->runMiddlewares($httpMethod, $uri, $request);
                 $class = $handler[0];
                 $action = $handler[1];
                 call_user_func([new $class, $action], ...$vars);

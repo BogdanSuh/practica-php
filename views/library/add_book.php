@@ -4,7 +4,12 @@
     <div class="error"><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
 <?php endif; ?>
 
-<form method="POST" class="add-book-form">
+<form method="POST" enctype="multipart/form-data" class="add-book-form">
+    <div class="form-group">
+        <label>Обложка книги</label>
+        <input type="file" name="cover_image" accept="image/jpeg,image/png,image/gif">
+        <small class="hint">JPG, PNG, GIF до 2MB</small>
+    </div>
     <div class="form-group">
         <label>Название книги <span class="required">*</span></label>
         <input type="text" name="book_title" required
@@ -59,7 +64,14 @@
         <small class="hint">Ссылка на PDF файл или страницу с электронной версией</small>
     </div>
 
+    <div class="form-group">
+        <label>Обложка книги</label>
+        <input type="file" name="cover_image" accept="image/jpeg,image/png,image/gif">
+        <small class="hint">Рекомендуемый размер: до 2MB. Форматы: JPG, PNG, GIF</small>
+    </div>
+
     <div class="form-actions">
+        <form method="POST" enctype="multipart/form-data" class="add-book-form">
         <button type="submit" class="btn-success">Добавить книгу</button>
         <a href="/library/catalog" class="btn">Отмена</a>
     </div>

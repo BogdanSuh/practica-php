@@ -17,7 +17,8 @@ class BookCopy extends Model
         'shelf_location',
         'status',
         'has_electronic_version',
-        'electronic_link'
+        'electronic_link',
+        'cover_image'
     ];
 
     // Связь с бронированиями

@@ -10,6 +10,7 @@
 <?php if (!app()->auth::check()): ?>
     <form method="post">
         <div class="form-group">
+            <input name="csrf_token" type="hidden" value="<?= app()->auth::generateCSRF() ?>"/>
             <label>Логин</label>
             <input type="text" name="login" required placeholder="Введите ваш логин">
         </div>

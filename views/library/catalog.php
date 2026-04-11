@@ -20,8 +20,15 @@
 
 <form method="GET" class="search-form">
     <div class="form-group">
-        <input type="text" name="search" placeholder="Поиск по названию или автору..."
-               value="<?= htmlspecialchars($search ?? '') ?>">
+        <select name="search_type" class="search-type">
+            <option value="all" <?= ($searchType ?? 'all') === 'all' ? 'selected' : '' ?>>Все поля</option>
+            <option value="title" <?= ($searchType ?? '') === 'title' ? 'selected' : '' ?>>По названию</option>
+            <option value="author" <?= ($searchType ?? '') === 'author' ? 'selected' : '' ?>>По автору</option>
+            <option value="qr" <?= ($searchType ?? '') === 'qr' ? 'selected' : '' ?>>По QR-коду</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <input type="text" name="search" placeholder="Поиск..." value="<?= htmlspecialchars($search ?? '') ?>">
     </div>
     <button type="submit">Найти</button>
 </form>

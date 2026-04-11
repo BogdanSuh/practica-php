@@ -1,5 +1,5 @@
 <h2>Регистрация нового пользователя</h2>
-
+<pre><?= $message ?? ''; ?></pre>
 <?php if (!empty($message)): ?>
     <div class="error"><?= $message ?></div>
 <?php endif; ?>
@@ -10,6 +10,7 @@
 
 <form method="post">
     <div class="form-group">
+        <input name="csrf_token" type="hidden" value="<?= app()->auth::generateCSRF() ?>"/>
         <label>Имя *</label>
         <input type="text" name="name" required placeholder="Введите ваше имя">
     </div>

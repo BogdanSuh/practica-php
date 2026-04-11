@@ -5,7 +5,7 @@ use Src\View;
 use Src\Request;
 use Model\Users;
 use Src\Auth\Auth;
-
+use Src\Validator\Validator;
 class Site
 {
     // Измените метод index, чтобы он не использовал таблицу posts
@@ -24,34 +24,25 @@ class Site
     public function signup(Request $request): string
     {
         if ($request->method === 'POST') {
-            $data = $request->all();
 
-            // Проверяем, существует ли пользователь с таким логином
-            if (Users::where('login', $data['login'])->exists()) {
-                return new View('site.signup', ['message' => 'Пользователь с таким логином уже существует']);
+            $validator = new Validator($request->all(), [
+                'name' => ['required'],
+                'login' => ['required', 'unique:users,login'],
+                'password' => ['required']
+            ], [
+                'required' => 'Поле :field пусто',
+                'unique' => 'Поле :field должно быть уникально'
+            ]);
+
+            if($validator->fails()){
+                return new View('site.signup',
+                    ['message' => json_encode($validator->errors(), JSON_UNESCAPED_UNICODE)]);
             }
 
-            // Хешируем пароль
-            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
-            $data['role'] = 'reader';
-            $data['reader_card'] = 'RD-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
-
-            // Создаем пользователя
-            $user = Users::create($data);
-
-            if ($user) {
-                // Автоматически авторизуем пользователя
-                Auth::login($user);
-
-                // Перенаправляем в личный кабинет
-                $_SESSION['success'] = 'Добро пожаловать в библиотеку!';
-                app()->route->redirect('/profile');
-                return '';
+            if (User::create($request->all())) {
+                app()->route->redirect('/login');
             }
-
-            return new View('site.signup', ['message' => 'Ошибка при регистрации']);
         }
-
         return new View('site.signup');
     }
 
@@ -80,4 +71,6 @@ class Site
         app()->route->redirect('/login');
         exit;
     }
+
+
 }

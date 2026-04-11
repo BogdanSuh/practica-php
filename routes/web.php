@@ -16,19 +16,17 @@ Route::add('GET', '/hello', [Site::class, 'hello']);
 Route::add(['GET', 'POST'], '/library/catalog', [LibraryController::class, 'catalog']);
 Route::add(['GET', 'POST'], '/library/search', [LibraryController::class, 'searchByQr']);
 
-// Маршруты библиотекаря
+// Маршруты библиотекаря (без ->middleware для теста)
 Route::add(['GET', 'POST'], '/library/reserve', [LibraryController::class, 'reserveBook']);
 Route::add(['GET', 'POST'], '/library/issue', [LibraryController::class, 'issueBook']);
 Route::add(['GET', 'POST'], '/library/return', [LibraryController::class, 'returnBook']);
 Route::add('GET', '/library/active-bookings', [LibraryController::class, 'activeBookings']);
 Route::add(['GET', 'POST'], '/library/add-book', [LibraryController::class, 'addBook']);
-Route::add(['GET', 'POST'], '/library/edit-book', [LibraryController::class, 'editBook']);  // ДОБАВЛЕНО
-Route::add('GET', '/library/delete-book', [LibraryController::class, 'deleteBook']);        // ДОБАВЛЕНО
+Route::add(['GET', 'POST'], '/library/edit-book', [LibraryController::class, 'editBook']);
+Route::add('GET', '/library/delete-book', [LibraryController::class, 'deleteBook']);
 Route::add('GET', '/library/readers', [LibraryController::class, 'readersList']);
 Route::add(['GET', 'POST'], '/library/add-reader', [LibraryController::class, 'addReader']);
-Route::add('GET', '/library/reader-books', [LibraryController::class, 'readerBooks']);      // ДОБАВЛЕНО
-
-// Бронирование книги читателем
+Route::add('GET', '/library/reader-books', [LibraryController::class, 'readerBooks']);
 Route::add(['GET', 'POST'], '/library/reader-reserve', [LibraryController::class, 'readerReserveBook']);
 
 // Маршруты читателя
