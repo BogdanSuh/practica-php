@@ -17,11 +17,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Model\\": "model/",
-            "Controller\\": "app/Controller/",
-            "Middlewares\\": "app/Middlewares/",
             "Src\\": "core/Src/",
-            "App\\": "package/src/"
+            "": "app/"
         }
     }
 }

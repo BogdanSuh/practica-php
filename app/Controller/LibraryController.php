@@ -3,29 +3,39 @@ namespace Controller;
 
 use Src\View;
 use Src\Request;
+use Model\BookCopy;
+use Model\Book;
 use Model\Users;
 use Src\Auth\Auth;
-use App\Services\CatalogService;
-use App\Services\BookingService;
-use App\Traits\UploadTrait;
 
 class LibraryController
 {
-    use UploadTrait;
-
-    private CatalogService $catalog;
-    private BookingService $booking;
-
-    public function __construct()
-    {
-        $this->catalog = new CatalogService();
-        $this->booking = new BookingService();
-    }
-
+    // Каталог книг (все экземпляры)
     public function catalog(Request $request): string
     {
         $search = $request->get('search');
-        $groupedBooks = $this->catalog->getGroupedBooks($search);
+        $query = BookCopy::query();
+
+        if ($search) {
+            $query->where('book_title', 'LIKE', "%{$search}%")
+                ->orWhere('author', 'LIKE', "%{$search}%");
+        }
+
+        $books = $query->get();
+
+        // Группируем по названию книг
+        $groupedBooks = [];
+        foreach ($books as $book) {
+            $key = $book->book_title . '|' . $book->author;
+            if (!isset($groupedBooks[$key])) {
+                $groupedBooks[$key] = [
+                    'title' => $book->book_title,
+                    'author' => $book->author,
+                    'copies' => []
+                ];
+            }
+            $groupedBooks[$key]['copies'][] = $book;
+        }
 
         return (new View())->render('library.catalog', [
             'groupedBooks' => $groupedBooks,
@@ -33,6 +43,7 @@ class LibraryController
         ]);
     }
 
+    // Поиск по QR-коду
     public function searchByQr(Request $request): string
     {
         $qrCode = $request->get('qr_code');
@@ -41,11 +52,12 @@ class LibraryController
         $message = '';
 
         if ($qrCode) {
-            $copy = $this->catalog->findBookByQr($qrCode);
+            $copy = BookCopy::where('qr_code', $qrCode)->first();
+
             if (!$copy) {
                 $message = 'Экземпляр с таким QR-кодом не найден';
             } else {
-                $booking = \Model\Book::where('copy_id', $copy->copy_id)
+                $booking = Book::where('copy_id', $copy->copy_id)
                     ->whereIn('status', ['reserved', 'issued'])
                     ->with('user')
                     ->first();
@@ -59,24 +71,42 @@ class LibraryController
         ]);
     }
 
+    // Бронирование книги (для библиотекаря)
     public function reserveBook(Request $request): string
     {
         if ($request->method === 'POST') {
-            $booking = $this->booking->createReservation(
-                $request->get('user_id'),
-                $request->get('copy_id'),
-                $request->get('due_date')
-            );
+            $copyId = $request->get('copy_id');
+            $userId = $request->get('user_id');
+            $dueDate = $request->get('due_date');
 
-            if ($booking) {
-                $_SESSION['success'] = 'Книга успешно забронирована';
+            $copy = BookCopy::find($copyId);
+            $user = Users::find($userId);
+
+            if ($copy && $user && $copy->isAvailable()) {
+                // Создаем бронирование
+                Book::create([
+                    'user_id' => $userId,
+                    'copy_id' => $copyId,
+                    'booking_date' => date('Y-m-d H:i:s'),
+                    'due_date' => $dueDate,
+                    'status' => 'reserved'
+                ]);
+
+                // Обновляем статус экземпляра
+                $copy->status = 'reserved';
+                $copy->save();
+
+                $_SESSION['success'] = 'Книга успешно забронирована для читателя ' . $user->name;
                 app()->route->redirect('/library/catalog');
                 return '';
+            } else {
+                $_SESSION['error'] = 'Ошибка: книга недоступна или читатель не найден';
             }
-            $_SESSION['error'] = 'Ошибка: книга недоступна';
         }
 
-        $availableCopies = \Model\BookCopy::where('status', 'in_hall')->get();
+        // Доступные книги
+        $availableCopies = BookCopy::where('status', 'in_hall')->get();
+        // Все читатели
         $readers = Users::where('role', 'reader')->get();
 
         return (new View())->render('library.reserve', [
@@ -85,11 +115,22 @@ class LibraryController
         ]);
     }
 
+    // Выдача книги (из бронирования)
     public function issueBook(Request $request): string
     {
-        $booking = $this->booking->issueBook($request->get('booking_id'));
+        $bookingId = $request->get('booking_id');
+        $booking = Book::find($bookingId);
 
-        if ($booking) {
+        if ($booking && $booking->status === 'reserved') {
+            $booking->issue_date = date('Y-m-d H:i:s');
+            $booking->status = 'issued';
+            $booking->save();
+
+            // Обновляем статус экземпляра
+            $copy = BookCopy::find($booking->copy_id);
+            $copy->status = 'issued';
+            $copy->save();
+
             $_SESSION['success'] = 'Книга выдана читателю';
         }
 
@@ -97,11 +138,22 @@ class LibraryController
         return '';
     }
 
+    // Возврат книги
     public function returnBook(Request $request): string
     {
-        $booking = $this->booking->returnBook($request->get('booking_id'));
+        $bookingId = $request->get('booking_id');
+        $booking = Book::find($bookingId);
 
-        if ($booking) {
+        if ($booking && $booking->status === 'issued') {
+            $booking->return_date = date('Y-m-d H:i:s');
+            $booking->status = 'returned';
+            $booking->save();
+
+            // Обновляем статус экземпляра
+            $copy = BookCopy::find($booking->copy_id);
+            $copy->status = 'in_hall';
+            $copy->save();
+
             $_SESSION['success'] = 'Книга возвращена в библиотеку';
         }
 
@@ -109,40 +161,70 @@ class LibraryController
         return '';
     }
 
+    // Активные бронирования и выдачи (для библиотекаря)
     public function activeBookings(Request $request): string
     {
-        $bookings = $this->booking->getAllActive();
+        $bookings = Book::whereIn('status', ['reserved', 'issued'])
+            ->with(['user', 'copy'])
+            ->orderBy('booking_date', 'DESC')
+            ->get();
 
         return (new View())->render('library.active-bookings', [
             'bookings' => $bookings
         ]);
     }
 
+    // Продление книги (для читателя)
+    // Продление книги (для читателя)
     public function extendBook(Request $request): string
     {
         $bookingId = $request->get('booking_id');
-        $days = (int)$request->get('days', 14);
+        $days = (int)$request->get('days', 7); // По умолчанию 7 дней
 
+        // Ограничиваем количество дней от 1 до 7
         if ($days < 1) $days = 1;
-        if ($days > 14) $days = 14;
+        if ($days > 7) $days = 7;
 
-        $booking = $this->booking->extendBook($bookingId, $days);
+        $booking = Book::find($bookingId);
 
-        if ($booking) {
-            $_SESSION['success'] = 'Книга продлена до ' . date('d.m.Y', strtotime($booking->due_date));
-        } else {
-            $_SESSION['error'] = 'Невозможно продлить: есть очередь';
+        if ($booking && $booking->user_id === app()->auth->user()->user_id) {
+            // Проверяем, есть ли очередь на эту книгу
+            $hasQueue = Book::where('copy_id', $booking->copy_id)
+                ->where('status', 'reserved')
+                ->where('booking_id', '!=', $bookingId)
+                ->exists();
+
+            if (!$hasQueue && $booking->status === 'issued') {
+                // Продлеваем книгу на выбранное количество дней
+                $booking->extend($days);
+                $_SESSION['success'] = 'Книга успешно продлена на ' . $days . ' дн. Новый срок возврата: ' . date('d.m.Y', strtotime($booking->due_date));
+            } else {
+                $_SESSION['error'] = 'Невозможно продлить: есть очередь на эту книгу';
+            }
         }
 
         app()->route->redirect('/profile');
         return '';
     }
 
+    // Личный кабинет читателя
     public function profile(Request $request): string
     {
         $user = app()->auth->user();
-        $active = $this->booking->getUserActive($user->user_id);
-        $history = $this->booking->getUserHistory($user->user_id);
+
+        // Активные выдачи и бронирования
+        $active = Book::where('user_id', $user->user_id)
+            ->whereIn('status', ['reserved', 'issued'])
+            ->with('copy')
+            ->orderBy('booking_date', 'DESC')
+            ->get();
+
+        // История
+        $history = Book::where('user_id', $user->user_id)
+            ->where('status', 'returned')
+            ->with('copy')
+            ->orderBy('return_date', 'DESC')
+            ->get();
 
         return (new View())->render('library.profile', [
             'user' => $user,
@@ -151,84 +233,7 @@ class LibraryController
         ]);
     }
 
-    public function addBook(Request $request): string
-    {
-        if ($request->method === 'POST') {
-            $data = $request->all();
-            $coverImage = $_FILES['cover_image'] ?? null;
-
-            if ($coverImage && $coverImage['error'] === UPLOAD_ERR_OK) {
-                $path = $this->uploadFile($coverImage, 'covers');
-                if ($path) {
-                    $data['cover_image'] = $path;
-                }
-            }
-
-            $book = $this->catalog->createBook($data);
-
-            if ($book) {
-                $_SESSION['success'] = 'Книга добавлена';
-                app()->route->redirect('/library/catalog');
-                return '';
-            }
-            $_SESSION['error'] = 'Ошибка при добавлении';
-        }
-
-        return (new View())->render('library.add_book');
-    }
-
-    public function readerReserveBook(Request $request): string
-    {
-        $userId = app()->auth->user()->user_id;
-        $booking = $this->booking->createReservation($userId, $request->get('copy_id'));
-
-        if ($booking) {
-            $_SESSION['success'] = 'Книга забронирована';
-        } else {
-            $_SESSION['error'] = 'Ошибка бронирования';
-        }
-
-        app()->route->redirect('/library/catalog');
-        return '';
-    }
-
-    public function readersList(Request $request): string
-    {
-        $readers = Users::where('role', 'reader')->orderBy('name')->get();
-
-        foreach ($readers as $reader) {
-            $reader->active_books = $this->booking->getUserActive($reader->user_id)->count();
-            $reader->read_books = $this->booking->getUserHistory($reader->user_id)->count();
-        }
-
-        return (new View())->render('library.readers_list', ['readers' => $readers]);
-    }
-
-    public function addReader(Request $request): string
-    {
-        if ($request->method === 'POST') {
-            $data = $request->all();
-
-            if (Users::where('login', $data['login'])->exists()) {
-                $_SESSION['error'] = 'Логин уже существует';
-                return (new View())->render('library.add_reader');
-            }
-
-            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
-            $data['role'] = 'reader';
-            $data['reader_card'] = 'RD-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
-
-            if (Users::create($data)) {
-                $_SESSION['success'] = 'Читатель добавлен';
-                app()->route->redirect('/library/readers');
-                return '';
-            }
-            $_SESSION['error'] = 'Ошибка при добавлении';
-        }
-
-        return (new View())->render('library.add_reader');
-    }
-
+    // Книги конкретного читателя (для библиотекаря)
     public function readerBooks(Request $request): string
     {
         $userId = $request->get('user_id');
@@ -240,7 +245,7 @@ class LibraryController
             return '';
         }
 
-        $bookings = \Model\Book::where('user_id', $userId)
+        $bookings = Book::where('user_id', $userId)
             ->with('copy')
             ->orderBy('booking_date', 'DESC')
             ->get();
@@ -251,10 +256,144 @@ class LibraryController
         ]);
     }
 
+    // Добавление нового читателя библиотекарем
+    public function addReader(Request $request): string
+    {
+        if ($request->method === 'POST') {
+            $data = $request->all();
+
+            // Проверка на существование логина
+            if (Users::where('login', $data['login'])->exists()) {
+                $_SESSION['error'] = 'Пользователь с таким логином уже существует';
+                return (new View())->render('library.add_reader');
+            }
+
+            // Хешируем пароль
+            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            $data['role'] = 'reader';
+
+            // Генерируем номер читательского билета
+            $data['reader_card'] = 'RD-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
+
+            if (Users::create($data)) {
+                $_SESSION['success'] = 'Читатель успешно добавлен';
+                app()->route->redirect('/library/readers');
+                return '';
+            }
+
+            $_SESSION['error'] = 'Ошибка при добавлении читателя';
+        }
+
+        return (new View())->render('library.add_reader');
+    }
+    // Добавление новой книги (для библиотекаря)
+    public function addBook(Request $request): string
+    {
+        if ($request->method === 'POST') {
+            $data = $request->all();
+
+            // Валидация обязательных полей
+            if (empty($data['book_title']) || empty($data['author']) || empty($data['shelf_location'])) {
+                $_SESSION['error'] = 'Заполните все обязательные поля';
+                return (new View())->render('library.add_book');
+            }
+
+            // Генерация QR-кода если не указан
+            if (empty($data['qr_code'])) {
+                $data['qr_code'] = 'QR-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
+            }
+
+            // Проверка на уникальность QR-кода
+            if (BookCopy::where('qr_code', $data['qr_code'])->exists()) {
+                $_SESSION['error'] = 'Книга с таким QR-кодом уже существует';
+                return (new View())->render('library.add_book', ['book' => $data]);
+            }
+
+            // Обработка чекбокса электронной версии
+            $data['has_electronic_version'] = isset($data['has_electronic_version']) ? 1 : 0;
+
+            // Если нет электронной версии, очищаем ссылку
+            if ($data['has_electronic_version'] == 0) {
+                $data['electronic_link'] = null;
+            }
+
+            // Статус новой книги - "в зале"
+            $data['status'] = 'in_hall';
+
+            // Создаем книгу
+            if (BookCopy::create($data)) {
+                $_SESSION['success'] = 'Книга "' . $data['book_title'] . '" успешно добавлена в каталог';
+                app()->route->redirect('/library/catalog');
+                return '';
+            }
+
+            $_SESSION['error'] = 'Ошибка при добавлении книги';
+        }
+
+        return (new View())->render('library.add_book');
+    }
+
+// Бронирование книги читателем
+    // Бронирование книги читателем
+    public function readerReserveBook(Request $request): string
+    {
+        $copyId = $request->get('copy_id');
+        $copy = BookCopy::find($copyId);
+
+        if (!$copy) {
+            $_SESSION['error'] = 'Книга не найдена';
+            app()->route->redirect('/library/catalog');
+            return '';
+        }
+
+        // Проверяем, доступна ли книга
+        if ($copy->status !== 'in_hall') {
+            $_SESSION['error'] = 'Эта книга уже забронирована или выдана';
+            app()->route->redirect('/library/catalog');
+            return '';
+        }
+
+        // Проверяем, не забронировал ли уже этот пользователь эту книгу
+        $existingBooking = Book::where('copy_id', $copyId)
+            ->where('user_id', app()->auth->user()->user_id)
+            ->whereIn('status', ['reserved', 'issued'])
+            ->exists();
+
+        if ($existingBooking) {
+            $_SESSION['error'] = 'Вы уже забронировали или взяли эту книгу';
+            app()->route->redirect('/library/catalog');
+            return '';
+        }
+
+        // Создаем бронирование
+        $booking = Book::create([
+            'user_id' => app()->auth->user()->user_id,
+            'copy_id' => $copyId,
+            'booking_date' => date('Y-m-d H:i:s'),
+            'due_date' => date('Y-m-d H:i:s', strtotime('+14 days')),
+            'status' => 'reserved'
+        ]);
+
+        if ($booking) {
+            // Обновляем статус экземпляра
+            $copy->status = 'reserved';
+            $copy->save();
+
+            $_SESSION['success'] = 'Книга "' . $copy->book_title . '" успешно забронирована! Ожидайте выдачи у библиотекаря.';
+        } else {
+            $_SESSION['error'] = 'Ошибка при бронировании книги';
+        }
+
+        app()->route->redirect('/library/catalog');
+        return '';
+    }
+
+    // Редактирование книги
+    // Редактирование книги
     public function editBook(Request $request): string
     {
         $copyId = $request->get('copy_id');
-        $book = \Model\BookCopy::find($copyId);
+        $book = BookCopy::find($copyId);
 
         if (!$book) {
             $_SESSION['error'] = 'Книга не найдена';
@@ -267,20 +406,22 @@ class LibraryController
             $data['has_electronic_version'] = isset($data['has_electronic_version']) ? 1 : 0;
 
             if ($book->update($data)) {
-                $_SESSION['success'] = 'Книга обновлена';
+                $_SESSION['success'] = 'Книга успешно обновлена';
                 app()->route->redirect('/library/catalog');
                 return '';
             }
-            $_SESSION['error'] = 'Ошибка при обновлении';
+
+            $_SESSION['error'] = 'Ошибка при обновлении книги';
         }
 
         return (new View())->render('library.edit_book', ['book' => $book]);
     }
 
+// Удаление книги
     public function deleteBook(Request $request): string
     {
         $copyId = $request->get('copy_id');
-        $book = \Model\BookCopy::find($copyId);
+        $book = BookCopy::find($copyId);
 
         if (!$book) {
             $_SESSION['error'] = 'Книга не найдена';
@@ -289,18 +430,38 @@ class LibraryController
         }
 
         if ($book->status !== 'in_hall') {
-            $_SESSION['error'] = 'Нельзя удалить выданную книгу';
+            $_SESSION['error'] = 'Нельзя удалить книгу, которая выдана или забронирована';
             app()->route->redirect('/library/catalog');
             return '';
         }
 
-        if ($this->catalog->deleteBook($book)) {
-            $_SESSION['success'] = 'Книга удалена';
-        } else {
-            $_SESSION['error'] = 'Ошибка при удалении';
-        }
-
+        $book->delete();
+        $_SESSION['success'] = 'Книга удалена из каталога';
         app()->route->redirect('/library/catalog');
         return '';
+    }
+
+    public function readersList(Request $request): string
+    {
+        $readers = Users::where('role', 'reader')
+            ->orderBy('name')
+            ->get();
+
+        // Подсчитываем статистику для каждого читателя
+        foreach ($readers as $reader) {
+            // Количество активных книг (выданных и забронированных)
+            $reader->active_books = Book::where('user_id', $reader->user_id)
+                ->whereIn('status', ['issued', 'reserved'])
+                ->count();
+
+            // Количество прочитанных книг (возвращенных)
+            $reader->read_books = Book::where('user_id', $reader->user_id)
+                ->where('status', 'returned')
+                ->count();
+        }
+
+        return (new View())->render('library.readers_list', [
+            'readers' => $readers
+        ]);
     }
 }

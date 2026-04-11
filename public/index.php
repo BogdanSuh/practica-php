@@ -4,6 +4,10 @@ declare(strict_types=1);
 //Включаем сессии на все страницы
 session_start();
 
+// ВКЛЮЧАЕМ ОТОБРАЖЕНИЕ ОШИБОК
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 try {
     //Создаем экземпляр приложения и запускаем его
     $app = require_once __DIR__ . '/../core/bootstrap.php';
