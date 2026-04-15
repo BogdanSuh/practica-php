@@ -39,8 +39,9 @@ class Site
                     ['message' => json_encode($validator->errors(), JSON_UNESCAPED_UNICODE)]);
             }
 
-            if (User::create($request->all())) {
+            if (Users::create($request->all())) {  // <- Обратите внимание: Users, не User
                 app()->route->redirect('/login');
+                return false;  // <- ВОТ ЭТУ СТРОКУ НУЖНО ДОБАВИТЬ
             }
         }
         return new View('site.signup');
